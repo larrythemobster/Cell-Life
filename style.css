@@ -1,0 +1,59 @@
+/* Custom styles */
+body {
+    font-family: 'Inter', sans-serif;
+}
+/* Make scrollbars dark in webkit browsers */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #111827; /* gray-900 */
+}
+::-webkit-scrollbar-thumb {
+    background: #4b5563; /* gray-600 */
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 */
+}
+/* Custom class for highlighting a species list item */
+.highlight {
+    animation: pulse-bg 1s ease-out;
+}
+@keyframes pulse-bg {
+    0% { background-color: #374151; } /* gray-700 */
+    50% { background-color: #f59e0b; } /* amber-500 */
+    100% { background-color: #374151; } /* gray-700 */
+}
+ /* Ensure canvas scales correctly within its container */
+ #canvas-container {
+    position: relative;
+    height: 66.66%; /* h-2/3 */
+}
+#simulationCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+/* --- ADDED: Modal Tab Styles --- */
+.modal-tab {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    color: #9ca3af; /* gray-400 */
+    background-color: transparent;
+    transition: all 0.2s ease;
+}
+
+.modal-tab:hover {
+    color: #fff;
+    background-color: #4b5563; /* gray-600 */
+}
+.modal-tab.tab-active {
+    color: #fff;
+    background-color: #3b82f6; /* blue-500 */
+}
+/* --- END ADDED --- */

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replicator Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="h-full overflow-hidden bg-gray-900 text-gray-300">
+    <div class="flex h-full">
+        <div class="flex-none w-72 bg-gray-800 p-4 overflow-y-auto">
+            <h1 class="text-2xl font-bold text-white mb-6">Replicator Sim</h1>
+
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-white mb-3">Controls</h2>
+                <div class="flex space-x-2">
+                    <button id="startStopBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Start
+                    </button>
+                    <button id="resetBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Reset
+                    </button>
+                </div>
+                 <div class="mt-2">
+                     <button id="leaderboardBtn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        View History
+                    </button>
+                 </div>
+                 <div class="mt-2">
+                     <button id="toggleCameraBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Camera: Auto
+                    </button>
+                 </div>
+                 <div class="mt-4">
+                    <label for="stepsPerFrame" class="block text-sm font-medium text-gray-400">Steps per Frame</label>
+                    <input type="range" id="stepsPerFrame" min="1" max="10" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="stepsPerFrameValue" class="text-sm text-gray-400">1</span>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-white mb-3">Global Stats</h2>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Simulation Step:</span>
+                        <span id="stepCount" class="font-medium text-white">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Cycle:</span>
+                        <span id="cycleStatus" class="font-medium text-white">Day</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Total Population:</span>
+                        <span id="totalPopulation" class="font-medium text-white">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Total Species:</span>
+                        <span id="speciesCount" class="font-medium text-white">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Food Pellets:</span>
+                        <span id="foodCount" class="font-medium text-white">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-semibold text-white mb-3">Legend</h2>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-blue-300">R:</span>
+                        <span class="text-gray-400" title="Energy gain efficiency">Efficiency</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-red-300">D:</span>
+                        <span class="text-gray-400" title="Base energy drain">Drain</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-purple-300">M:</span>
+                        <span class="text-gray-400" title="Mutation chance">Mutation</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-yellow-300">A:</span>
+                        <span class="text-gray-400" title="Attack">Attack</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-green-300">Df:</span>
+                        <span class="text-gray-400" title="Defense">Defense</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-indigo-300">S:</span>
+                        <span class="text-gray-400" title="Stealth">Stealth</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-pink-300">E:</span>
+                        <span class="text-gray-400" title="Max Energy">Max Energy</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-gray-300">Sz:</span>
+                        <span class="text-gray-400" title="Size">Size</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-orange-400">Lf:</span>
+                        <span class="text-gray-400" title="Lifespan">Lifespan</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-teal-300">W:</span>
+                        <span class="text-gray-400" title="Waste Tolerance">Waste Tol.</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-lime-300">Di:</span>
+                        <span class="text-gray-400" title="Diet (0=Herb, 1=Carn)">Diet</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold" style="color: #fde047;">P:</span> <span class="text-gray-400" title="Perception Range">Perception</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold" style="color: #fda4af;">Sp:</span> <span class="text-gray-400" title="Speed">Speed</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 flex flex-col overflow-hidden p-4 pl-0">
+            <div id="canvas-container" class="bg-gray-800 rounded-lg overflow-hidden relative border border-gray-700 h-full">
+                </div>
+            
+            <div class="flex-none h-1/3 flex mt-4 space-x-4">
+                <div class="flex-1 bg-gray-800 p-4 rounded-lg border border-gray-700 overflow-y-auto">
+                    <h2 class="text-lg font-semibold text-white mb-3">Top Species</h2>
+                    <div id="speciesListContainer" class="space-y-2">
+                        </div>
+                </div>
+                <div class="flex-1 bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h2 class="text-lg font-semibold text-white mb-3">Population Over Time</h2>
+                    <div class="relative h-full w-full min-h-[150px]">
+                        <canvas id="populationGraph"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="leaderboardModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-8 hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl h-full max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <div class="flex space-x-1">    
+                    <button id="tabLeaderboard" class="modal-tab tab-active">Leaderboard</button>
+                    <button id="tabSpeciesHistory" class="modal-tab">Species History</button>
+                </div>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+            </div>
+            
+            <div class="flex-1 flex overflow-hidden">
+                <div id="leaderboardContent" class="flex-1 flex overflow-hidden">
+                    <div id="leaderboardList" class="w-1/2 overflow-y-auto p-4 border-r border-gray-700">
+                        </div>
+                    <div id="leaderboardDetail" class="w-1/2 overflow-y-auto p-4">
+                        <div class="text-gray-400 text-center mt-10">Select a record to view species details.</div>
+                        </div>
+                </div>
+
+                <div id="speciesHistoryContent" class="flex-1 flex overflow-hidden hidden">
+                    <div id="speciesHistoryList" class="w-1/2 overflow-y-auto p-4 border-r border-gray-700">
+                        </div>
+                    <div id="speciesHistoryDetail" class="w-1/2 overflow-y-auto p-4">
+                        <div class="text-gray-400 text-center mt-10">Select a species to view details.</div>
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
