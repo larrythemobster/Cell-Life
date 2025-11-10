@@ -43,6 +43,13 @@ export function updateGraphData(sortedSpecies) {
     simulationHistory.labels.push(simulationStep);
     const topSpeciesIds = new Set(sortedSpecies.slice(0, 5).map(s => s.id));
 
+    // --- EVOLVE GAME ---
+    // Ensure player species is always tracked on the graph
+    if (App.state.playerSpeciesId) {
+        topSpeciesIds.add(App.state.playerSpeciesId);
+    }
+    // --- END ---
+
     for(const species of sortedSpecies) {
         if (!topSpeciesIds.has(species.id)) continue; 
 
@@ -54,7 +61,7 @@ export function updateGraphData(sortedSpecies) {
                 backgroundColor: utils.colorToRgba(species.color, 0.5),
                 fill: false,
                 tension: 0.1,
-                borderWidth: 2,
+                borderWidth: (species.id === App.state.playerSpeciesId) ? 4 : 2, // Thicker line for player
                 pointRadius: 0,
                 speciesId: species.id
             };
@@ -120,7 +127,7 @@ export function handleGraphClick(evt) {
  */
 export function updateUI() {
     const { allSpecies, allReplicators, simulationStep, foodPellets, lastGraphUpdateStep, isDay } = App.state;
-    const { stepCountEl, totalPopulationEl, speciesCountEl, foodCountEl, speciesListContainer, cycleStatusEl } = App.dom;
+    const { stepCountEl, totalPopulationEl, speciesCountEl, foodCountEl, speciesListContainer, cycleStatusEl, evolutionPointsCountEl } = App.dom;
     
     const speciesPop = {};
     const speciesEnergy = {};
@@ -144,6 +151,12 @@ export function updateUI() {
     foodCountEl.textContent = foodPellets.length.toLocaleString();
     cycleStatusEl.textContent = isDay ? 'Day' : 'Night'; 
 
+    if (evolutionPointsCountEl) {
+        evolutionPointsCountEl.textContent = Math.floor(App.state.evolutionPoints).toLocaleString();
+    }
+
+    updateActiveToolUI();
+
     const sortedSpecies = Object.values(allSpecies)
         .filter(s => s.population > 0)
         .sort((a, b) => b.population - a.population);
@@ -154,7 +167,15 @@ export function updateUI() {
     for (let i = 0; i < Math.min(sortedSpecies.length, 10); i++) {
         const species = sortedSpecies[i];
         const item = document.createElement('div');
-        item.className = 'flex items-center justify-between p-2 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-colors cursor-pointer';
+        
+        // --- EVOLVE GAME: Highlight Player Species ---
+        if (species.id === App.state.playerSpeciesId) {
+            item.className = 'flex items-center justify-between p-2 rounded-lg bg-purple-900/50 hover:bg-purple-800/50 transition-colors cursor-pointer border-2 border-purple-500';
+        } else {
+            item.className = 'flex items-center justify-between p-2 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-colors cursor-pointer';
+        }
+        // --- END ---
+
         item.dataset.speciesId = species.id;
         
         const avgEnergy = (speciesEnergy[species.id] / species.population) || 0;
@@ -163,9 +184,9 @@ export function updateUI() {
 
         item.innerHTML = `
             <div class="flex items-center space-x-3 min-w-0">
-                <div class="flex-shrink-0 w-3 h-3 rounded-full" style="background-color: ${species.color}; border: 1px solid #fff3;"></div>
+                <div class.flex-shrink-0 w-3 h-3 rounded-full" style="background-color: ${species.color}; border: 1px solid #fff3;"></div>
                 <div class="min-w-0 flex-1">
-                    <div class="text-white font-medium text-sm truncate">${species.name}</div>
+                    <div class="text-white font-medium text-sm truncate">${species.name} ${species.id === App.state.playerSpeciesId ? '(You)' : ''}</div>
                     <div class="text-xs text-gray-400 break-words" title="${statsTitle}">
                         <span class="text-blue-300">R:</span>${species.replicationRate.toFixed(1)} 
                         <span class="text-red-300">D:</span>${species.deathRate.toFixed(2)} 
@@ -195,6 +216,29 @@ export function updateUI() {
     updateGraphData(sortedSpecies);
 }
         
+export function updateActiveToolUI() {
+    const ep = App.state.evolutionPoints;
+    
+    const tools = [
+        { id: 'foodDropBtn', cost: App.config.POWER_COST_FOOD_DROP },
+        { id: 'spawnAllyBtn', cost: App.config.POWER_COST_SPAWN_ALLY },
+        { id: 'wasteBlightBtn', cost: App.config.POWER_COST_WASTE_BLIGHT }
+    ];
+
+    for (const tool of tools) {
+        const btn = App.dom[tool.id];
+        if (btn) {
+            const hasEnoughEP = ep >= tool.cost;
+            btn.disabled = !hasEnoughEP;
+
+            if (App.state.activeTool === btn.dataset.tool && !hasEnoughEP) {
+                App.state.activeTool = 'none';
+                btn.classList.remove('tool-active');
+            }
+        }
+    }
+}
+
 export function checkIndividualLeaderboards(rep) {
     const leaderboards = App.state.simulationHistory.leaderboards;
     
@@ -488,6 +532,28 @@ export function setupEventHandlers() {
     });
     
     dom.toggleCameraBtn.addEventListener('click', App.handlers.toggleCameraMode);
+
+    dom.evolveBtn.addEventListener('click', App.handlers.openEvolveModal);
+    dom.closeEvolveModalBtn.addEventListener('click', App.handlers.closeEvolveModal);
+
+    dom.evolveModal.addEventListener('click', (e) => {
+        const button = e.target.closest('.evolve-btn');
+        if (button && !button.disabled) {
+            const trait = button.dataset.trait;
+            if (trait) {
+                App.handlers.upgradePlayerTrait(trait);
+            }
+        }
+    });
+    
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tool = btn.dataset.tool;
+            if (tool) {
+                App.handlers.handleToolSelect(tool);
+            }
+        });
+    });
     
     const resizeObserver = new ResizeObserver(entries => {
         window.requestAnimationFrame(() => { 
@@ -525,12 +591,14 @@ export function updateSpeciesHistoryList() {
         const lifespan = species.extinctionStep === -1 
             ? `(Age: ${App.state.simulationStep - species.spawnStep})`
             : `(Lived: ${species.extinctionStep - species.spawnStep} steps)`;
+        
+        const playerName = species.id === App.state.playerSpeciesId ? ' (You)' : '';
 
         item.innerHTML = `
             <div class="flex justify-between items-center">
                 <div class="flex items-center space-x-2">
                     <div class="flex-shrink-0 w-3 h-3 rounded-full" style="background-color: ${species.color}; border: 1px solid #fff3;"></div>
-                    <span class="text-sm font-medium text-white">${species.name}</span>
+                    <span class="text-sm font-medium text-white">${species.name}${playerName}</span>
                     ${statusDot}
                 </div>
                 <span class="text-sm font-bold text-yellow-300">${species.peakPopulation.toLocaleString()}</span>
@@ -549,6 +617,11 @@ export function updateSpeciesHistoryList() {
 export function showSpeciesHistoryDetails(speciesId) {
     const { speciesHistoryList, speciesHistoryDetail } = App.dom;
     const species = App.state.allSpecies[speciesId];
+
+    let parentName = "Primordial"; // Default for initial species
+    if (species.parentSpeciesId !== null && App.state.allSpecies[species.parentSpeciesId]) {
+        parentName = App.state.allSpecies[species.parentSpeciesId].name;
+    }
     
     if (!species) {
         speciesHistoryDetail.innerHTML = '<div class="text-gray-400 text-center mt-10">Error: Could not find species data.</div>';
@@ -562,15 +635,18 @@ export function showSpeciesHistoryDetails(speciesId) {
     const lineage = species.extinctionStep === -1
         ? `Born: Step ${species.spawnStep.toLocaleString()} (Alive)`
         : `Born: Step ${species.spawnStep.toLocaleString()} | Died: Step ${species.extinctionStep.toLocaleString()}`;
+    
+    const playerName = species.id === App.state.playerSpeciesId ? ' (You)' : '';
 
     speciesHistoryDetail.innerHTML = `
         <div class="species-detail-card p-2 rounded-lg bg-gray-700">
             <div class="flex items-center space-x-3 mb-4">
                 <div class="flex-shrink-0 w-8 h-8 rounded-full" style="background-color: ${species.color}; border: 2px solid #fff3;"></div>
-                <h3 class="text-xl font-bold text-white truncate">${species.name}</h3>
+                <h3 class="text-xl font-bold text-white truncate">${species.name}${playerName}</h3>
             </div>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between"><span class="text-gray-400">Lineage:</span><span class="font-medium text-white">${lineage}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Mutated From:</span><span class"font-medium text-white">${parentName}</span></div> <div class="flex justify-between"><span class="text-gray-400">Peak Population:</span><span class="font-medium text-white">${(species.peakPopulation || 0).toLocaleString()}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Peak Population:</span><span class="font-medium text-white">${(species.peakPopulation || 0).toLocaleString()}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Total Kills:</span><span class="font-medium text-white">${(species.totalKills || 0).toLocaleString()}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Total Food:</span><span class="font-medium text-white">${(species.totalFoodEaten || 0).toLocaleString()}</span></div>

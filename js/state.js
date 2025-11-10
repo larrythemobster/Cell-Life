@@ -46,6 +46,10 @@ export const state = {
     isDay: true,
     cycleTimer: 0,
 
+    playerSpeciesId: null,
+    evolutionPoints: 0,
+    activeTool: 'none',
+
     populationChart: null,
     simulationHistory: {
         labels: [],

@@ -63,7 +63,16 @@ export const App = {
         closeModalBtn: null,
         leaderboardList: null,
         leaderboardDetail: null,
-        toggleCameraBtn: null, 
+        toggleCameraBtn: null,
+        evolveBtn: null,
+        evolutionPointsCountEl: null,
+        evolveModal: null,
+        closeEvolveModalBtn: null,
+        evolveEpCountEl: null,
+        evolveSpeciesNameEl: null,
+        foodDropBtn: null,
+        spawnAllyBtn: null,
+        wasteBlightBtn: null,
     },
 
     simulation: {
@@ -100,6 +109,13 @@ export const App = {
             App.state.simulationStep = 0;
             App.state.lastGraphUpdateStep = 0;
             
+            App.state.playerSpeciesId = null;
+            App.state.evolutionPoints = 0;
+            App.state.activeTool = 'none';
+            if (App.dom.evolutionPointsCountEl) {
+                App.dom.evolutionPointsCountEl.textContent = '0';
+            }
+
             App.state.isDay = true;
             App.state.cycleTimer = 0;
             
@@ -152,6 +168,14 @@ export const App = {
                 const newSpecies = new App.classes.ReplicatorSpecies({ ...speciesConfig, spawnStep: 0 });
                 App.state.allSpecies[newSpecies.id] = newSpecies;
                 
+                // --- EVOLVE GAME ---
+                // Assign the first species (e.g., "Herbivore") as the player's
+                if (App.state.playerSpeciesId === null) {
+                    App.state.playerSpeciesId = newSpecies.id;
+                    console.log(`Player species set to: ${newSpecies.name} (ID: ${newSpecies.id})`);
+                }
+                // --- END ---
+                
                 if (App.state.worldWidth > 0 && App.state.worldHeight > 0) {
                     for (let i = 0; i < App.config.STARTING_POPULATION_PER_SPECIES; i++) {
                         
@@ -202,7 +226,13 @@ export const App = {
             }
             
             App.state.simulationStep++;
-            App.state.newBirths = []; 
+
+            // --- EVOLVE GAME: Passive EP Gain ---
+            const playerSpecies = App.state.allSpecies[App.state.playerSpeciesId];
+            if (playerSpecies && playerSpecies.population > 0 && App.state.simulationStep % 100 === 0) {
+                 App.state.evolutionPoints += 1;
+            }
+            // --- END ---
 
             App.state.cycleTimer++;
             if (App.state.cycleTimer >= App.config.CYCLE_LENGTH) {
@@ -323,6 +353,7 @@ export const App = {
             }
 
             App.state.allReplicators.push(...App.state.newBirths);
+            App.state.newBirths = [];
             
             const activeSpeciesIds = new Set(App.state.allReplicators.map(r => r.species.id));
             const allSpeciesIds = Object.keys(App.state.allSpecies).map(id => parseInt(id, 10));
@@ -331,9 +362,34 @@ export const App = {
                 if (App.state.allSpecies[id] && !activeSpeciesIds.has(id)) {
                     if (App.state.allSpecies[id].extinctionStep === -1) {
                          App.state.allSpecies[id].extinctionStep = App.state.simulationStep;
+
+                         // --- EVOLVE GAME: LOSE CONDITION ---
+                         if (id === App.state.playerSpeciesId && App.state.simulationRunning) {
+                            console.log("--- GAME OVER: Your species was eradicated! ---");
+                            // In a real app, you'd show a modal.
+                            App.handlers.toggleSimulation();
+                         }
+                         // --- END ---
                     }
                 }
             }
+
+            // --- EVOLVE GAME: WIN CONDITION ---
+            if (App.state.simulationRunning && App.state.playerSpeciesId !== null) {
+                const playerSpecies = App.state.allSpecies[App.state.playerSpeciesId];
+                const totalPopulation = App.state.allReplicators.length;
+
+                if (playerSpecies && playerSpecies.population > 0 && totalPopulation > 0) {
+                    const playerDominance = playerSpecies.population / totalPopulation;
+                    
+                    if (playerDominance >= 0.98) {
+                        console.log(`--- VICTORY: Your species is ${(playerDominance * 100).toFixed(0)}% dominant! ---`);
+                        // In a real app, you'd show a modal.
+                        App.handlers.toggleSimulation();
+                    }
+                }
+            }
+            // --- END ---
         },
         logicLoop(timestamp) {
             requestAnimationFrame(App.simulation.logicLoop);
@@ -397,6 +453,7 @@ export const App = {
         resetSimulation() {
             App.state.simulationRunning = false;
             console.log("Resetting simulation...");
+            App.state.activeTool = 'none';
             App.simulation.initializeSimulation();
         },
 
@@ -419,8 +476,8 @@ export const App = {
         },
         
         /** Helper to convert screen space to world space */
-        getMouseWorldPos(e) {
-            return App.state.worldContainer.toLocal(e.global);
+        getMouseWorldPos(globalPos) {
+            return App.state.worldContainer.toLocal(globalPos);
         },
 
         /** Center the camera on a specific world coordinate */
@@ -465,6 +522,13 @@ export const App = {
         /** Handles mouse down for panning. */
         handleMouseDown(e) {
             if (e.originalEvent.button !== 0) return;
+
+            if (App.state.activeTool !== 'none') {
+                const worldPos = App.handlers.getMouseWorldPos(e.global);
+                App.handlers.useActiveTool(worldPos);
+                return; // Don't start panning
+            }
+
             App.state.isDragging = true;
             App.state.lastMousePos = { x: e.global.x, y: e.global.y };
             
@@ -525,7 +589,240 @@ export const App = {
             worldContainer.y += rendererScreenPos.y - newRendererScreenPos.y;
 
             App.handlers.clampCamera();
+        },
+
+        // --- EVOLVE GAME HANDLERS ---
+        
+        /**
+         * Calculates the EP cost to upgrade a specific trait.
+         */
+        getTraitUpgradeCost(trait, currentValue) {
+            switch(trait) {
+                case 'replicationRate': return Math.floor(currentValue * 30) + 10;
+                case 'deathRate':       return Math.floor((1 - currentValue) * 30) + 10; // Cost to *lower* drain
+                case 'mutationRate':    return Math.floor(currentValue * 20) + 5; // Cost to *increase* random mutation
+                case 'attack':          return Math.floor(currentValue * 20) + 5;
+                case 'defense':         return Math.floor(currentValue * 20) + 5;
+                case 'stealth':         return Math.floor(currentValue * 20) + 5;
+                case 'maxEnergy':       return Math.floor(currentValue / 10) + 5;
+                case 'size':            return Math.floor(currentValue * 5) + 5;
+                case 'lifespan':        return Math.floor(currentValue / 100) + 5;
+                case 'wasteTolerance':  return Math.floor(currentValue * 25) + 10;
+                case 'diet':            return Math.floor(currentValue * 30) + 15; // Cost to become more carnivorous
+                case 'perception':      return Math.floor(currentValue / 5) + 5;
+                case 'speed':           return Math.floor(currentValue * 10) + 5;
+                default: return 999;
+            }
+        },
+        handleToolSelect(toolName) {
+            if (App.state.activeTool === toolName) {
+                // Toggle off
+                App.state.activeTool = 'none';
+                document.querySelector(`[data-tool="${toolName}"]`).classList.remove('tool-active');
+                return;
+            }
+
+            // Check cost
+            let cost = 0;
+            switch(toolName) {
+                case 'food':   cost = App.config.POWER_COST_FOOD_DROP; break;
+                case 'spawn':  cost = App.config.POWER_COST_SPAWN_ALLY; break;
+                case 'blight': cost = App.config.POWER_COST_WASTE_BLIGHT; break;
+            }
+
+            if (App.state.evolutionPoints < cost) {
+                App.state.activeTool = 'none'; // Ensure it's off
+                return; // Can't afford
+            }
+
+            // Deactivate all other tools
+            App.state.activeTool = toolName;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('tool-active');
+            });
+            // Activate the new one
+            document.querySelector(`[data-tool="${toolName}"]`).classList.add('tool-active');
+        },
+        /**
+         * Executes the currently armed tool at the given world position.
+         */
+        useActiveTool(worldPos) {
+            let cost = 0;
+            const tool = App.state.activeTool;
+
+            switch(tool) {
+                case 'food':
+                    cost = App.config.POWER_COST_FOOD_DROP;
+                    if (App.state.evolutionPoints < cost) break;
+                    
+                    App.state.evolutionPoints -= cost;
+                    for (let i = 0; i < 10; i++) {
+                        const x = worldPos.x + (Math.random() - 0.5) * 30;
+                        const y = worldPos.y + (Math.random() - 0.5) * 30;
+                        if (App.grid.terrain.getTerrainAt(x, y) !== App.config.TERRAIN_TYPES.WALL) {
+                            App.simulation.spawnFood(x, y);
+                        }
+                    }
+                    console.log("Used Food Drop");
+                    break;
+
+                case 'spawn':
+                    cost = App.config.POWER_COST_SPAWN_ALLY;
+                    const playerSpecies = App.state.allSpecies[App.state.playerSpeciesId];
+                    if (App.state.evolutionPoints < cost || !playerSpecies) break;
+                    
+                    if (App.grid.terrain.getTerrainAt(worldPos.x, worldPos.y) === App.config.TERRAIN_TYPES.WALL) break;
+
+                    App.state.evolutionPoints -= cost;
+                    const individual = new App.classes.ReplicatorIndividual(playerSpecies, worldPos.x, worldPos.y, App.config.INITIAL_ENERGY);
+                    
+                    App.state.newBirths.push(individual);
+                    console.log("Used Spawn Ally");
+                    break;
+                
+                case 'blight':
+                    cost = App.config.POWER_COST_WASTE_BLIGHT;
+                    if (App.state.evolutionPoints < cost) break;
+
+                    if (App.grid.terrain.getTerrainAt(worldPos.x, worldPos.y) === App.config.TERRAIN_TYPES.WALL) break;
+
+                    App.state.evolutionPoints -= cost;
+                    for (let i = -2; i <= 2; i++) {
+                        for (let j = -2; j <= 2; j++) {
+                            const x = worldPos.x + (i * App.config.GRID_CELL_SIZE);
+                            const y = worldPos.y + (j * App.config.GRID_CELL_SIZE);
+                            App.grid.waste.addWaste(x, y, 20); // Add a large amount of waste
+                        }
+                    }
+                    console.log("Used Waste Blight");
+                    break;
+            }
+
+            App.state.activeTool = 'none';
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('tool-active');
+            });
+            App.ui.updateActiveToolUI(); // Re-check disabled states
+        },
+        /**
+         * Updates the "Evolve" modal with current species stats and costs.
+         */
+        updateEvolveModalUI() {
+            const playerSpecies = App.state.allSpecies[App.state.playerSpeciesId];
+            if (!playerSpecies) return;
+
+            App.dom.evolveSpeciesNameEl.textContent = playerSpecies.name;
+            const currentEP = Math.floor(App.state.evolutionPoints);
+            App.dom.evolveEpCountEl.textContent = currentEP.toLocaleString();
+            
+            const traits = [
+                'replicationRate', 'deathRate', 'mutationRate', 'attack', 'defense', 'stealth',
+                'maxEnergy', 'size', 'lifespan', 'wasteTolerance', 'diet', 'perception', 'speed'
+            ];
+
+            for (const trait of traits) {
+                const value = playerSpecies[trait];
+                const cost = App.handlers.getTraitUpgradeCost(trait, value);
+                
+                let valueStr;
+                if (value < 10) valueStr = value.toFixed(2);
+                else if (value < 100) valueStr = value.toFixed(1);
+                else valueStr = Math.floor(value).toLocaleString();
+                
+                document.getElementById(`evolve-${trait}-val`).textContent = valueStr;
+                const costEl = document.getElementById(`evolve-${trait}-cost`);
+                const btnEl = costEl.parentElement;
+
+                costEl.textContent = `(${cost} EP)`;
+                
+                if (currentEP < cost) {
+                    btnEl.disabled = true;
+                    btnEl.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    btnEl.classList.add('bg-gray-500', 'cursor-not-allowed');
+                } else {
+                    btnEl.disabled = false;
+                    btnEl.classList.add('bg-green-600', 'hover:bg-green-700');
+                    btnEl.classList.remove('bg-gray-500', 'cursor-not-allowed');
+                }
+            }
+            
+            // Special case: make "Drain" button red (it's a "bad" thing to upgrade)
+            const drainBtn = document.querySelector('[data-trait="deathRate"]');
+            if (drainBtn.disabled) {
+                drainBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+            } else {
+                 drainBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                 drainBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            }
+        },
+
+        /**
+         * Opens the Evolve modal and pauses the game.
+         */
+        openEvolveModal() {
+            if (App.state.simulationRunning) {
+                App.handlers.toggleSimulation();
+            }
+            App.handlers.updateEvolveModalUI();
+            App.dom.evolveModal.classList.remove('hidden');
+        },
+
+        /**
+         * Closes the Evolve modal.
+         */
+        closeEvolveModal() {
+            App.dom.evolveModal.classList.add('hidden');
+        },
+
+        /**
+         * The core logic for spending EP to upgrade a trait.
+         */
+        upgradePlayerTrait(trait) {
+            const playerSpecies = App.state.allSpecies[App.state.playerSpeciesId];
+            if (!playerSpecies) return;
+
+            const currentValue = playerSpecies[trait];
+            const cost = App.handlers.getTraitUpgradeCost(trait, currentValue);
+
+            if (App.state.evolutionPoints < cost) return;
+
+            App.state.evolutionPoints -= cost;
+            
+            // Apply upgrade
+            switch (trait) {
+                case 'replicationRate': playerSpecies.replicationRate = App.utils.clamp(playerSpecies.replicationRate + 0.05, 0.1, 5.0); break;
+                case 'deathRate':       playerSpecies.deathRate = App.utils.clamp(playerSpecies.deathRate - 0.005, 0.001, 1.0); break; // Gets *lower*
+                case 'mutationRate':    playerSpecies.mutationRate = App.utils.clamp(playerSpecies.mutationRate + 0.05, 0.0, 1.0); break;
+                case 'attack':          playerSpecies.attack = App.utils.clamp(playerSpecies.attack + 0.05, 0, 1.0); break;
+                case 'defense':         playerSpecies.defense = App.utils.clamp(playerSpecies.defense + 0.05, 0, 1.0); break;
+                case 'stealth':         playerSpecies.stealth = App.utils.clamp(playerSpecies.stealth + 0.05, 0, 1.0); break;
+                case 'maxEnergy':       playerSpecies.maxEnergy = Math.max(20, playerSpecies.maxEnergy + 10); break;
+                case 'size':            playerSpecies.size = App.utils.clamp(playerSpecies.size + 0.2, 2, 10); break;
+                case 'lifespan':        playerSpecies.lifespan = Math.max(500, playerSpecies.lifespan + 100); break;
+                case 'wasteTolerance':  playerSpecies.wasteTolerance = App.utils.clamp(playerSpecies.wasteTolerance + 0.02, 0.0, 1.0); break;
+                case 'diet':            playerSpecies.diet = App.utils.clamp(playerSpecies.diet + 0.05, 0.0, 1.0); break;
+                case 'perception':      playerSpecies.perception = Math.max(20, playerSpecies.perception + 5); break;
+                case 'speed':           playerSpecies.speed = App.utils.clamp(playerSpecies.speed + 0.1, 1.0, 5.0); break;
+            }
+            
+            // Re-balance combat stats
+            if (['attack', 'defense', 'stealth'].includes(trait)) {
+                const combatBudget = 1.0;
+                const totalCombat = playerSpecies.attack + playerSpecies.defense + playerSpecies.stealth;
+                if (totalCombat > combatBudget) {
+                    const ratio = combatBudget / totalCombat;
+                    playerSpecies.attack = App.utils.clamp(playerSpecies.attack * ratio, 0, 1.0);
+                    playerSpecies.defense = App.utils.clamp(playerSpecies.defense * ratio, 0, 1.0);
+                    playerSpecies.stealth = App.utils.clamp(playerSpecies.stealth * ratio, 0, 1.0);
+                }
+            }
+            
+            // Refresh the modal UI
+            App.handlers.updateEvolveModalUI();
+            // Refresh the main UI
+            App.ui.updateUI();
         }
+        // --- END EVOLVE HANDLERS ---
     },
 
     init() {
@@ -553,7 +850,24 @@ export const App = {
         this.dom.speciesHistoryList = document.getElementById('speciesHistoryList');
         this.dom.speciesHistoryDetail = document.getElementById('speciesHistoryDetail');
         this.dom.toggleCameraBtn = document.getElementById('toggleCameraBtn'); 
+        this.dom.evolveBtn = document.getElementById('evolveBtn');
+        this.dom.evolutionPointsCountEl = document.getElementById('evolutionPointsCount');
+        this.dom.evolveModal = document.getElementById('evolveModal');
+        this.dom.closeEvolveModalBtn = document.getElementById('closeEvolveModalBtn');
+        this.dom.evolveEpCountEl = document.getElementById('evolveEpCount');
+        this.dom.evolveSpeciesNameEl = document.getElementById('evolveSpeciesName');
+        this.dom.foodDropBtn = document.getElementById('foodDropBtn');
+        this.dom.spawnAllyBtn = document.getElementById('spawnAllyBtn');
+        this.dom.wasteBlightBtn = document.getElementById('wasteBlightBtn');
+        this.dom.foodDropCost = document.getElementById('foodDropCost');
+        this.dom.spawnAllyCost = document.getElementById('spawnAllyCost');
+        this.dom.wasteBlightCost = document.getElementById('wasteBlightCost');
         
+        // Set cost text from config
+        this.dom.foodDropCost.textContent = App.config.POWER_COST_FOOD_DROP;
+        this.dom.spawnAllyCost.textContent = App.config.POWER_COST_SPAWN_ALLY;
+        this.dom.wasteBlightCost.textContent = App.config.POWER_COST_WASTE_BLIGHT;
+
         this.drawing.initPixi(this.dom.canvasContainer);
         
         this.ui.setupEventHandlers();

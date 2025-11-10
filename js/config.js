@@ -25,10 +25,10 @@ export const FERTILE_SPAWN_BONUS = 0.25;
 export const VENT_EVAPORATION_MULTIPLIER = 5.0;
 
 export const CYCLE_LENGTH = 5000;
-export const NIGHT_PERCEPTION_PENALTY = 0.5;
+export const NIGHT_PERCEPTION_PENALTY = 0.75;
 export const NIGHT_STEALTH_BONUS = 0.2;
-export const NIGHT_ENERGY_DRAIN_MULTIPLIER = 1.2;
-export const NIGHT_FOOD_SPAWN_MULTIPLIER = 0.25;
+export const NIGHT_ENERGY_DRAIN_MULTIPLIER = 1.0;
+export const NIGHT_FOOD_SPAWN_MULTIPLIER = 0.5;
 
 export const CROWDING_FACTOR = 2500;
 export const STARTING_POPULATION_PER_SPECIES = 50;
@@ -156,3 +156,7 @@ export const LEADERBOARD_CATEGORIES_TEMPLATE = {
     largest: { label: "Largest Size Gene", value: 0, species: null, unit: "" },
     bestPerception: { label: "Highest Perception Gene", value: 0, species: null, unit: "" },
 };
+
+export const POWER_COST_FOOD_DROP = 10;
+export const POWER_COST_SPAWN_ALLY = 50;
+export const POWER_COST_WASTE_BLIGHT = 30;

@@ -41,6 +41,26 @@
                     <input type="range" id="stepsPerFrame" min="1" max="10" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
                     <span id="stepsPerFrameValue" class="text-sm text-gray-400">1</span>
                 </div>
+                <div class="mt-4">
+                     <button id="evolveBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Evolve (<span id="evolutionPointsCount">0</span> EP)
+                    </button>
+                 </div>
+            </div>
+            
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-white mb-3">Active Powers</h2>
+                <div class="space-y-2">
+                    <button id="foodDropBtn" data-tool="food" class="tool-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Food Drop (<span id="foodDropCost">10</span> EP)
+                    </button>
+                    <button id="spawnAllyBtn" data-tool="spawn" class="tool-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Spawn Ally (<span id="spawnAllyCost">50</span> EP)
+                    </button>
+                    <button id="wasteBlightBtn" data-tool="blight" class="tool-btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Waste Blight (<span id="wasteBlightCost">30</span> EP)
+                    </button>
+                </div>
             </div>
 
             <div class="mb-6">
@@ -171,6 +191,159 @@
                     <div id="speciesHistoryDetail" class="w-1/2 overflow-y-auto p-4">
                         <div class="text-gray-400 text-center mt-10">Select a species to view details.</div>
                         </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="evolveModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-8 hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl h-full max-h-[80vh] flex flex-col">
+            
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+                <div class="flex-1">
+                    <h2 class="text-xl font-bold text-white">Evolve Species: <span id="evolveSpeciesName"></span></h2>
+                </div>
+                <div class="flex-1 text-center">
+                    <h3 class="text-lg font-bold text-yellow-300">Evolution Points: <span id="evolveEpCount">0</span></h3>
+                </div>
+                <div class="flex-1 text-right">
+                    <button id="closeEvolveModalBtn" class="text-gray-400 hover:text-white text-3xl font-bold">&times;</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-blue-300">R:</span> Efficiency</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-replicationRate-val">0.00</span></div>
+                        </div>
+                        <button data-trait="replicationRate" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-replicationRate-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-red-300">D:</span> Drain</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-deathRate-val">0.00</span></div>
+                        </div>
+                        <button data-trait="deathRate" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-deathRate-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-purple-300">M:</span> Mutation</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-mutationRate-val">0.00</span></div>
+                        </div>
+                        <button data-trait="mutationRate" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-mutationRate-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-yellow-300">A:</span> Attack</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-attack-val">0.00</span></div>
+                        </div>
+                        <button data-trait="attack" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-attack-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-green-300">Df:</span> Defense</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-defense-val">0.00</span></div>
+                        </div>
+                        <button data-trait="defense" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-defense-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-indigo-300">S:</span> Stealth</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-stealth-val">0.00</span></div>
+                        </div>
+                        <button data-trait="stealth" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-stealth-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-pink-300">E:</span> Max Energy</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-maxEnergy-val">0</span></div>
+                        </div>
+                        <button data-trait="maxEnergy" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-maxEnergy-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-gray-300">Sz:</span> Size</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-size-val">0.0</span></div>
+                        </div>
+                        <button data-trait="size" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-size-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-orange-400">Lf:</span> Lifespan</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-lifespan-val">0</span></div>
+                        </div>
+                        <button data-trait="lifespan" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-lifespan-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-teal-300">W:</span> Waste Tol.</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-wasteTolerance-val">0.00</span></div>
+                        </div>
+                        <button data-trait="wasteTolerance" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-wasteTolerance-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold text-lime-300">Di:</span> Diet</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-diet-val">0.00</span></div>
+                        </div>
+                        <button data-trait="diet" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-diet-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold" style="color: #fde047;">P:</span> Perception</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-perception-val">0</span></div>
+                        </div>
+                        <button data-trait="perception" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-perception-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-gray-700/80">
+                        <div>
+                            <div class="font-medium text-white"><span class="font-bold" style="color: #fda4af;">Sp:</span> Speed</div>
+                            <div class="text-sm text-gray-400">Current: <span id="evolve-speed-val">0.0</span></div>
+                        </div>
+                        <button data-trait="speed" class="evolve-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-3 rounded transition-colors">
+                            +<span id="evolve-speed-cost">(0 EP)</span>
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </div>

@@ -8,6 +8,7 @@ import { wasteManager } from './wasteGrid.js';
 export class ReplicatorSpecies {
     constructor(config) {
         this.id = App.state.speciesCounter++;
+        this.parentSpeciesId = config.parentSpeciesId || null;
         this.name = config.name || `Mutant #${this.id}`;
         this.color = config.color || `hsl(${Math.random() * 360}, 70%, 70%)`;
         
@@ -55,8 +56,17 @@ export class ReplicatorSpecies {
             name: `Mutant #${App.state.speciesCounter}`,
             spawnStep: App.state.simulationStep
         };
+
+        const combatBudget = 1.0;
+        const totalCombat = newTraits.attack + newTraits.defense + newTraits.stealth;
+        if (totalCombat > 0) {
+            const ratio = combatBudget / totalCombat;
+            newTraits.attack = utils.clamp(newTraits.attack * ratio, 0, 1.0);
+            newTraits.defense = utils.clamp(newTraits.defense * ratio, 0, 1.0);
+            newTraits.stealth = utils.clamp(newTraits.stealth * ratio, 0, 1.0);
+        }
         
-        const newSpecies = new ReplicatorSpecies(newTraits);
+        const newSpecies = new ReplicatorSpecies({ ...newTraits, parentSpeciesId: this.id });
         App.state.allSpecies[newSpecies.id] = newSpecies;
         return newSpecies;
     }
@@ -208,6 +218,10 @@ export class ReplicatorIndividual {
         
         this.replications++;
         this.species.totalReplications++;
+
+        if (this.species.id === App.state.playerSpeciesId) {
+            App.state.evolutionPoints += 1;
+        }
         
         let newIndividual;
         if (Math.random() < (this.species.mutationRate * App.config.MUTATION_CHANCE_BASE)) {
@@ -290,7 +304,7 @@ export class ReplicatorIndividual {
         const perception = App.state.isDay 
             ? this.species.perception 
             : this.species.perception * App.config.NIGHT_PERCEPTION_PENALTY;
-        let minFoodDistSq = perception * perception;
+        let maxFoodScore = -Infinity; // REPLACE THIS
 
         if (wantsFood) {
             const gridX = Math.floor(this.x / App.config.REP_GRID_CELL_SIZE);
@@ -306,8 +320,9 @@ export class ReplicatorIndividual {
                         if (food.isEaten) continue; 
 
                         const distSq = utils.getDistanceSq(this.x, this.y, food.x, food.y);
-                        if (distSq < minFoodDistSq) {
-                            minFoodDistSq = distSq;
+                        const foodScore = App.config.FOOD_ENERGY / (distSq + 1e-6); // Score = Energy / Distance
+                        if (foodScore > maxFoodScore && distSq < (perception * perception)) {
+                            maxFoodScore = foodScore;
                             bestFoodTarget = food;
                         }
                     }
@@ -316,7 +331,7 @@ export class ReplicatorIndividual {
         }
 
         if (wantsPrey) {
-            let minPreyScore = Infinity; 
+            let maxPreyScore = -Infinity; 
             const perceptionSq = perception * perception;
             
             const gridX = Math.floor(this.x / App.config.REP_GRID_CELL_SIZE);
@@ -337,9 +352,12 @@ export class ReplicatorIndividual {
 
                         const distSq = utils.getDistanceSq(this.x, this.y, rep.x, rep.y);
                         if (distSq < perceptionSq) {
-                            const preyScore = rep.currentEnergy;
-                            if (preyScore < minPreyScore) {
-                                minPreyScore = preyScore;
+                            const energyScore = rep.currentEnergy / (distSq + 1e-6);
+                            const winChance = Math.max(0, this.species.attack - rep.species.defense);
+                            const preyScore = energyScore * (0.1 + winChance);
+
+                            if (preyScore > maxPreyScore) {
+                                maxPreyScore = preyScore;
                                 bestPreyTarget = rep;
                             }
                         }
@@ -667,8 +685,12 @@ export class ReplicatorIndividual {
                 const stolenEnergy = (App.config.COMBAT_ENERGY_REWARD_BASE + opponent.species.size * 5) * this.species.replicationRate; 
                 this.currentEnergy += stolenEnergy;
                 opponent.isAlive = false; 
+                opponent.species.population--; // <--- ADD THIS LINE
                 this.kills++; 
                 this.species.totalKills++; 
+                if (this.species.id === App.state.playerSpeciesId) {
+                    App.state.evolutionPoints += 5;
+                }
                 if (App.config.DEBUG_CARNIVORES && this.species.diet >= 1.0) {
                     console.log(`%c[CARNIVORE ${Math.floor(this.id)}] Attack SUCCESS. ${this.kills} kills.`, 'color: #00ff00');
                 }
@@ -676,8 +698,12 @@ export class ReplicatorIndividual {
                 const stolenEnergy = (App.config.COMBAT_ENERGY_REWARD_BASE + this.species.size * 5) * opponent.species.replicationRate;
                 opponent.currentEnergy += stolenEnergy;
                 this.isAlive = false;
+                this.species.population--; // <--- ADD THIS LINE
                 opponent.kills++;
                 opponent.species.totalKills++;
+                if (opponent.species.id === App.state.playerSpeciesId) {
+                    App.state.evolutionPoints += 5; // Grant EP if the player's species gets a kill
+                }
                 if (App.config.DEBUG_CARNIVORES && this.species.diet >= 1.0) {
                      console.log(`%c[COMBAT] Attacker ${Math.floor(this.id)} LOSES`, 'color: #ff0000');
                 }
