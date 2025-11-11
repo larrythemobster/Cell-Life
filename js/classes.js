@@ -148,20 +148,6 @@ export class ReplicatorIndividual {
             this.stateTimer = App.config.AI_STATE_CHANGE_COOLDOWN;
         }
 
-        const fleeTarget = this.checkForDanger();
-        
-        if (fleeTarget) {
-            if (this.state !== 'FLEEING') {
-                this.stateTimer = App.config.AI_STATE_CHANGE_COOLDOWN;
-            }
-            this.state = 'FLEEING';
-            this.currentTarget = fleeTarget;
-        } else if (this.state === 'FLEEING') {
-            this.state = 'WANDERING';
-            this.currentTarget = null;
-            this.stateTimer = 0;
-        }
-
         if (this.state !== 'FLEEING') {
             
             let taskIsInvalid = false;
@@ -201,7 +187,30 @@ export class ReplicatorIndividual {
             }
 
             if (shouldFindNewTask) {
-                this.findNewTask(); 
+                const fleeTarget = this.checkForDanger();
+                if (fleeTarget) {
+                    if (this.state !== 'FLEEING') {
+                        this.stateTimer = App.config.AI_STATE_CHANGE_COOLDOWN;
+                    }
+                    this.state = 'FLEEING';
+                    this.currentTarget = fleeTarget;
+                } else {
+                    this.findNewTask(); 
+                }
+            }
+        } else {
+            if (this.stateTimer > 0) {
+                this.stateTimer--;
+            }
+            
+            if (this.stateTimer === 0) {
+                this.stateTimer = App.config.AI_STATE_CHANGE_COOLDOWN;
+                const fleeTarget = this.checkForDanger();
+                if (!fleeTarget) {
+                    this.state = 'WANDERING';
+                    this.currentTarget = null;
+                    this.stateTimer = 0;
+                }
             }
         }
 

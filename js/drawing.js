@@ -24,7 +24,7 @@ export function initPixi(containerElement) {
     const terrainContainer = new Container();
     terrainContainer.zIndex = 0;
     
-    const wasteContainer = new Container();
+    const wasteContainer = new Graphics(); // MODIFIED: Was Container
     wasteContainer.zIndex = 1;
     
     const foodContainer = new Container();
@@ -192,7 +192,7 @@ export function drawTerrain() {
  * (This function is unchanged and correct)
  */
 export function updateGraphics() {
-    const { allReplicators, wasteGrid, wasteGraphics, wasteContainer } = App.state;
+    const { allReplicators, wasteGrid, wasteContainer } = App.state; // MODIFIED: Removed wasteGraphics
 
     for (const rep of allReplicators) {
         if (rep.pixiObject) {
@@ -204,36 +204,21 @@ export function updateGraphics() {
         }
     }
     
-    const activeWasteKeys = new Set();
     const cellSize = App.config.GRID_CELL_SIZE;
     
+    wasteContainer.clear();
+
     for (const [key, waste] of wasteGrid.entries()) {
         if (waste > 0.1) {
-            activeWasteKeys.add(key);
             const alpha = utils.clamp(waste / 20, 0, 0.4);
+            const [x, y] = key.split(',').map(Number);
             
-            let g = wasteGraphics.get(key);
-            if (!g) {
-                const [x, y] = key.split(',').map(Number);
-                g = new Graphics();
-                g.beginFill(0xdc2626, 1.0);
-                g.drawRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                g.endFill();
-                wasteContainer.addChild(g);
-                wasteGraphics.set(key, g);
-            }
-            g.alpha = alpha;
-            g.visible = true;
+            wasteContainer.beginFill(0xdc2626, alpha);
+            wasteContainer.drawRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            wasteContainer.endFill();
         }
     }
     
-    for (const [key, g] of wasteGraphics.entries()) {
-        if (!activeWasteKeys.has(key)) {
-            g.destroy();
-            wasteGraphics.delete(key);
-        }
-    }
-
     if(App.state.nightOverlay) {
         App.state.nightOverlay.visible = !App.state.isDay;
     }

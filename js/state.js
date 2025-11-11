@@ -34,7 +34,6 @@ export const state = {
     foodContainer: null,
     repContainer: null,
     nightOverlay: null,
-    wasteGraphics: new Map(),
     foodGrid: new Map(),
     repGraphicsPool: [],
     foodGraphicsPool: [],

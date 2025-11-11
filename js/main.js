@@ -94,8 +94,7 @@ export const App = {
                     App.drawing.returnFoodGraphic(App.state.foodContainer.children[0]);
                 }
                 
-                App.state.wasteContainer.removeChildren();
-                App.state.wasteGraphics.clear();
+                App.state.wasteContainer.clear();
                 
                 App.state.terrainContainer.removeChildren();
             }
